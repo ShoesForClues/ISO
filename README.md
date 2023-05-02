@@ -3,7 +3,7 @@
 
 ISO (Intermediate Script Object) is a stack oriented instruction format intended for embedded applications.
 
-The first version is written in Lua for testing purposes. It will be ported to C once the specifications have been finalized.
+The first version is written in Lua for prototyping purposes. It will be ported to C once the specifications have been finalized.
 ## Hello World
 ```asm
 TAG "msg_start"    REM "Stores current stack pointer"
