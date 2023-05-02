@@ -1,0 +1,8 @@
+TAG "MSG_START"
+ARR "Hello World!"
+TAG "MSG_END"
+
+VAR "MSG_START"
+VAR "MSG_END"
+INT 0x12
+INT 0x0E

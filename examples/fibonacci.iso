@@ -1,0 +1,14 @@
+TAG "A" NUM 1
+TAG "B" NUM 1
+
+SEC "Fib"
+	VAR "A"   GET
+	VAR "B"   GET
+	INT 0x10
+	ADD DUP
+	VAR "B"   GET
+	VAR "A"   SET
+	VAR "B"   SET
+	NUM 255
+	REC "Fib" JLE
+	INT 0x0E
