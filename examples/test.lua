@@ -14,7 +14,7 @@ INT 0x01           REM "Interrupt program with print request"
 INT 0x02           REM "Interrupt program with termination"
 ]]
 
-local bytecode=compiler:compile(
+local bytecode=compiler:compile(          --Convert source to bytecode
 	parser:parse(
 		lexer:lex(
 			source,
@@ -23,13 +23,13 @@ local bytecode=compiler:compile(
 	)
 )
 
-local context=vm:new()
+local context=vm:new()                    --Create new VM
 vm:init(context,bytecode)
 
 while true do
-	vm:run(context) --Program pauses when INT register is not 0
+	vm:run(context)                       --Program pauses when INT register is not 0
 	
-	if context.INT==0x01 then --Program is requesting to print
+	if context.INT==0x01 then             --Program is requesting to print
 		local msg_end   = vm:pop(context) --Pop 2 values from the stack
 		local msg_start = vm:pop(context)
 		
@@ -37,10 +37,10 @@ while true do
 			context.stack,msg_start+1,msg_end
 		)))
 		
-		context.INT=0x00 --Set INT register back to 0
-	elseif context.INT==0x02 then --Program is requesting to terminate
+		context.INT=0x00                  --Set INT register back to 0
+	elseif context.INT==0x02 then         --Program is requesting to terminate
 		break
-	else --Unknown interrupt
+	else                                  --Unknown interrupt
 		print("UNHANDLED INTERRUPT")
 		vm:debug(context)
 		
