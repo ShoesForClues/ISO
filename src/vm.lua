@@ -8,6 +8,15 @@ INTERRUPT STATUS CODES
 0x05 - EOL
 ]]
 
+local bit=bit32 or require("bit")
+
+local bit_lshift = bit.lshift
+local bit_rshift = bit.rshift
+local bit_and    = bit.band
+local bit_or     = bit.bor
+local bit_xor    = bit.bxor
+local bit_not    = bit.bnot
+
 local vm={}
 
 -------------------------------------------------------------------------------
@@ -37,16 +46,18 @@ vm.run=function(vm,context)
 	
 	while context.INT==0 do
 		if context.INT~=0 then
-			return
+			break
 		elseif context.SP<1 then
 			context.INT=0x02
-			return
+			
+			break
 		elseif (
 			context.PC<1 or 
 			context.PC>#program
 		) then
 			context.INT=0x05
-			return
+			
+			break
 		end
 		
 		local opcode=program[context.PC]
@@ -57,6 +68,8 @@ vm.run=function(vm,context)
 			context.INT=0x01
 		end
 	end
+	
+	return context.INT
 end
 
 vm.step=function(vm,context)
@@ -64,16 +77,18 @@ vm.step=function(vm,context)
 	local opcode  = program[context.PC]
 	
 	if context.INT~=0 then
-		return
+		return context.INT
 	elseif context.SP<1 then
 		context.INT=0x02
-		return
+		
+		return context.INT
 	elseif (
 		context.PC<1 or 
 		context.PC>#program
 	) then
 		context.INT=0x05
-		return
+		
+		return context.INT
 	end
 	
 	if vm.execute[opcode] then
@@ -81,50 +96,16 @@ vm.step=function(vm,context)
 	else
 		context.INT=0x01
 	end
+	
+	return context.INT
 end
 
 vm.debug=function(vm,context)
-	local INT     = context.INT
-	local PC      = context.PC
-	local SP      = context.SP
-	local stack   = context.stack
-	local program = context.program
-	local opcode  = program[PC]
-	
 	print(("INT: %.8X\tPC: %.8X\tSP: %.8X"):format(
-		INT,
-		PC,
-		SP
+		context.INT,
+		context.PC,
+		context.SP
 	))
-	
-	--[[
-	print("STACK: ")
-	for _,value in ipairs(stack) do
-		print(("%.8X"):format(value))
-	end
-	]]
-	
-	if PC>#program then
-		return
-	end
-	
-	if opcode==0x11 then
-		print(("OP: %.2X %.2X"):format(
-			program[PC],
-			program[PC+1]
-		))
-	elseif opcode==0x10 or opcode==0x20 then
-		print(("OP: %.2X %.8X"):format(
-			program[PC],
-			program[PC+1]
-		))
-	elseif opcode==0x21 then
-		print(("OP: %.2X %.2X "..("%.8X "):rep(program[PC+1])):format(
-			(unpack or table.unpack)(program,PC,PC+program[PC+1]+1)
-		))
-	else
-		print(("OP: %.2X"):format(program[PC]))
-	end
 end
 
 vm.push=function(vm,context,value)
@@ -140,7 +121,7 @@ vm.pop=function(vm,context)
 	local stack = context.stack
 	local value = stack[SP-1]
 	
-	stack[SP]  = nil
+	stack[SP-1]  = nil
 	context.SP = SP-1
 	
 	return value
@@ -219,15 +200,15 @@ vm.execute[0x30]=function(context) --INC
 		stack[SP+i-2]=0x00
 	end
 	
-	context.SP  = SP+count-1
-	context.PC  = PC+1
+	context.SP = SP+count-1
+	context.PC = PC+1
 end
 
 vm.execute[0x31]=function(context) --DEC
 	local PC    = context.PC
 	local SP    = context.SP
 	local stack = context.stack
-	local count = stack[SP]
+	local count = stack[SP-1]
 	
 	for i=SP-1,SP-count-1,-1 do
 		stack[i]=nil
@@ -452,6 +433,81 @@ vm.execute[0x65]=function(context) --MOD
 	
 	stack[SP-1] = nil
 	stack[SP-2] = operand_a%operand_b
+	context.SP  = SP-1
+	context.PC  = PC+1
+end
+
+vm.execute[0x70]=function(context) --NOT
+	local PC        = context.PC
+	local SP        = context.SP
+	local program   = context.program
+	local stack     = context.stack
+	
+	stack[SP-1] = bit_not(stack[SP-1])
+	context.PC  = PC+1
+end
+
+vm.execute[0x71]=function(context) --AND
+	local PC        = context.PC
+	local SP        = context.SP
+	local program   = context.program
+	local operand_a = stack[SP-2]
+	local operand_b = stack[SP-1]
+	
+	stack[SP-1] = nil
+	stack[SP-2] = bit_and(operand_a,operand_b)
+	context.SP  = SP-1
+	context.PC  = PC+1
+end
+
+vm.execute[0x72]=function(context) --BOR
+	local PC        = context.PC
+	local SP        = context.SP
+	local program   = context.program
+	local operand_a = stack[SP-2]
+	local operand_b = stack[SP-1]
+	
+	stack[SP-1] = nil
+	stack[SP-2] = bit_or(operand_a,operand_b)
+	context.SP  = SP-1
+	context.PC  = PC+1
+end
+
+vm.execute[0x73]=function(context) --XOR
+	local PC        = context.PC
+	local SP        = context.SP
+	local program   = context.program
+	local operand_a = stack[SP-2]
+	local operand_b = stack[SP-1]
+	
+	stack[SP-1] = nil
+	stack[SP-2] = bit_xor(operand_a,operand_b)
+	context.SP  = SP-1
+	context.PC  = PC+1
+end
+
+vm.execute[0x74]=function(context) --LSH
+	local PC        = context.PC
+	local SP        = context.SP
+	local program   = context.program
+	local operand_a = stack[SP-2]
+	local operand_b = stack[SP-1]
+	
+	stack[SP-1] = nil
+	stack[SP-2] = bit_lshift(operand_a,operand_b)
+	context.SP  = SP-1
+	context.PC  = PC+1
+end
+
+vm.execute[0x75]=function(context) --RSH
+	local PC        = context.PC
+	local SP        = context.SP
+	local program   = context.program
+	local operand_a = stack[SP-2]
+	local operand_b = stack[SP-1]
+	
+	stack[SP-1] = nil
+	stack[SP-2] = bit_rshift(operand_a,operand_b)
 	context.SP  = SP-1
 	context.PC  = PC+1
 end
