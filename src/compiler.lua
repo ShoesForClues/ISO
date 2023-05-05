@@ -1,3 +1,12 @@
+local bit=bit32 or require("bit")
+
+local bit_lshift = bit.lshift
+local bit_rshift = bit.rshift
+local bit_and    = bit.band
+local bit_or     = bit.bor
+local bit_xor    = bit.bxor
+local bit_not    = bit.bnot
+
 local compiler={}
 
 -------------------------------------------------------------------------------
@@ -954,17 +963,77 @@ compiler.translate["VAR"]=function(compiler,context,operation)
 	bytecode[#bytecode+1] = 0x41
 end
 
+compiler.translate["CSR"]=function(compiler,context,operation)
+	if #operation.parameters>0 then
+		compiler:report(
+			operation.filename,
+			operation.row,
+			operation.column,
+			"Unexpected parameter"
+		)
+	end
+	
+	local bytecode = context.bytecode
+	
+	bytecode[#bytecode+1] = 0x20 --NUM 0x01
+	bytecode[#bytecode+1] = 0x01
+	bytecode[#bytecode+1] = 0x40 --SET
+	bytecode[#bytecode+1] = 0x20 --NUM
+	bytecode[#bytecode+1] = #bytecode+13
+	bytecode[#bytecode+1] = 0x20 --NUM 0x00
+	bytecode[#bytecode+1] = 0x00
+	bytecode[#bytecode+1] = 0x41 --GET
+	bytecode[#bytecode+1] = 0x11 --REG 0x02
+	bytecode[#bytecode+1] = 0x02
+	bytecode[#bytecode+1] = 0x20 --NUM 0x00
+	bytecode[#bytecode+1] = 0x00
+	bytecode[#bytecode+1] = 0x40 --SET
+	bytecode[#bytecode+1] = 0x20 --NUM 0x01
+	bytecode[#bytecode+1] = 0x01
+	bytecode[#bytecode+1] = 0x41 --GET
+	bytecode[#bytecode+1] = 0x50 --JMP
+end
+
+compiler.translate["RET"]=function(compiler,context,operation)
+	if #operation.parameters>0 then
+		compiler:report(
+			operation.filename,
+			operation.row,
+			operation.column,
+			"Unexpected parameter"
+		)
+	end
+	
+	local bytecode = context.bytecode
+	
+	bytecode[#bytecode+1] = 0x11 --REG 0x02
+	bytecode[#bytecode+1] = 0x02
+	bytecode[#bytecode+1] = 0x20 --NUM 0x01
+	bytecode[#bytecode+1] = 0x00
+	bytecode[#bytecode+1] = 0x41 --GET
+	bytecode[#bytecode+1] = 0x61 --SUB
+	bytecode[#bytecode+1] = 0x31 --DEC
+	bytecode[#bytecode+1] = 0x20 --NUM 0x01
+	bytecode[#bytecode+1] = 0x00
+	bytecode[#bytecode+1] = 0x40 --SET
+	bytecode[#bytecode+1] = 0x50 --JMP
+end
+
 -------------------------------------------------------------------------------
 
 compiler.compile=function(compiler,operations)
 	local context={
 		operations  = operations,
 		parse_index = 1,
+		word_size   = 32,
 		bytecode    = {0x20,0x00,0x30},
 		definitions = {},
 		sections    = {},
 		recalls     = {},
-		variables   = {}
+		variables   = {
+			{("ISO_CALL_STACK"):byte(1,10)},
+			{("ISO_CALL_ADDRESS"):byte(1,10)}
+		}
 	}
 	
 	while context.parse_index<=#context.operations do
