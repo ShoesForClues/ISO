@@ -56,25 +56,7 @@ typedef struct {
 	iso_word *stack;
 } iso_vm;
 
-void iso_vm_init(
-	iso_vm *context,
-	iso_char *program,
-	iso_uint program_size,
-	iso_word *stack,
-	iso_uint stack_size
-) {
-	context->INT          = 0;
-	context->PC           = 0;
-	context->SP           = 0;
-	context->program_size = program_size;
-	context->stack_size   = stack_size;
-	context->program      = program;
-	context->stack        = stack;
-}
-
-iso_char iso_vm_fetch(
-	iso_vm *context
-) {
+iso_char iso_vm_fetch(iso_vm *context) {
 	iso_uint  PC           = context->PC;
 	iso_uint  program_size = context->program_size;
 	iso_char *program      = context->program;
@@ -90,10 +72,7 @@ iso_char iso_vm_fetch(
 	return program[PC];
 }
 
-void iso_vm_push(
-	iso_vm *context,
-	iso_word value
-) {
+void iso_vm_push(iso_vm *context,iso_word value) {
 	iso_uint  SP         = context->SP;
 	iso_uint  stack_size = context->stack_size;
 	iso_word *stack      = context->stack;
@@ -108,9 +87,7 @@ void iso_vm_push(
 	stack[SP]   = value;
 }
 
-iso_word iso_vm_pop(
-	iso_vm *context
-) {
+iso_word iso_vm_pop(iso_vm *context) {
 	iso_uint  SP    = context->SP;
 	iso_word *stack = context->stack;
 	
@@ -125,11 +102,7 @@ iso_word iso_vm_pop(
 	return stack[SP];
 }
 
-void iso_vm_set(
-	iso_vm *context,
-	iso_uint address,
-	iso_word value
-) {
+void iso_vm_set(iso_vm *context,iso_uint address,iso_word value) {
 	iso_uint  SP    = context->SP;
 	iso_word *stack = context->stack;
 	
@@ -142,10 +115,7 @@ void iso_vm_set(
 	context->stack[address]=value;
 }
 
-iso_word iso_vm_get(
-	iso_vm *context,
-	iso_uint address
-) {
+iso_word iso_vm_get(iso_vm *context,iso_uint address) {
 	iso_uint  SP    = context->SP;
 	iso_word *stack = context->stack;
 	
@@ -158,19 +128,17 @@ iso_word iso_vm_get(
 	return context->stack[address];
 }
 
-void iso_vm_goto(
-	iso_vm *context,
-	iso_uint address
-) {
-	if (address>=context->program_size)
+void iso_vm_goto(iso_vm *context,iso_uint address) {
+	if (address>=context->program_size) {
 		context->INT=ISO_INT_ILLEGAL_JUMP;
+		
+		return;
+	}
 	
 	context->PC=address;
 }
 
-iso_uint iso_vm_run(
-	iso_vm *context
-) {
+iso_uint iso_vm_run(iso_vm *context) {
 	if (context->INT!=0)
 		return context->INT;
 	
@@ -183,7 +151,7 @@ iso_uint iso_vm_run(
 	/* Working variables */
 	
 	iso_uint A,B;
-	iso_word D,E;
+	iso_word C,D;
 	
 	do {
 		switch(iso_vm_fetch(context)) {
@@ -231,11 +199,11 @@ iso_uint iso_vm_run(
 				if (*SP<2)
 					break;
 				
-				D = iso_vm_get(context,*SP-2);
-				E = iso_vm_get(context,*SP-1);
+				C = iso_vm_get(context,*SP-2);
+				D = iso_vm_get(context,*SP-1);
 				
-				iso_vm_set(context,*SP-2,E);
-				iso_vm_set(context,*SP-1,D);
+				iso_vm_set(context,*SP-2,D);
+				iso_vm_set(context,*SP-1,C);
 				
 				break;
 			case ISO_OP_JMP:
@@ -246,66 +214,66 @@ iso_uint iso_vm_run(
 				break;
 			case ISO_OP_JEQ:
 				A = (iso_uint)iso_vm_pop(context);
-				E = iso_vm_pop(context);
+				D = iso_vm_pop(context);
 				D = iso_vm_pop(context);
 				
-				if (D==E)
+				if (C==D)
 					iso_vm_goto(context,A);
 				
 				break;
 			case ISO_OP_JNE:
 				A = (iso_uint)iso_vm_pop(context);
-				E = iso_vm_pop(context);
 				D = iso_vm_pop(context);
+				C = iso_vm_pop(context);
 				
-				if (D!=E)
+				if (C!=D)
 					iso_vm_goto(context,A);
 				
 				break;
 			case ISO_OP_JLS:
 				A = (iso_uint)iso_vm_pop(context);
-				E = iso_vm_pop(context);
 				D = iso_vm_pop(context);
+				C = iso_vm_pop(context);
 				
-				if (D<E)
+				if (C<D)
 					iso_vm_goto(context,A);
 				
 				break;
 			case ISO_OP_JLE:
 				A = (iso_uint)iso_vm_pop(context);
-				E = iso_vm_pop(context);
 				D = iso_vm_pop(context);
+				C = iso_vm_pop(context);
 				
-				if (D<=E)
+				if (C<=D)
 					iso_vm_goto(context,A);
 				
 				break;
 			case ISO_OP_ADD:
-				E = iso_vm_pop(context);
 				D = iso_vm_pop(context);
+				C = iso_vm_pop(context);
 				
-				iso_vm_push(context,D+E);
+				iso_vm_push(context,C+D);
 				
 				break;
 			case ISO_OP_SUB:
-				E = iso_vm_pop(context);
 				D = iso_vm_pop(context);
+				C = iso_vm_pop(context);
 				
-				iso_vm_push(context,D-E);
+				iso_vm_push(context,C-D);
 				
 				break;
 			case ISO_OP_MUL:
-				E = iso_vm_pop(context);
 				D = iso_vm_pop(context);
+				C = iso_vm_pop(context);
 				
-				iso_vm_push(context,D*E);
+				iso_vm_push(context,C*D);
 				
 				break;
 			case ISO_OP_DIV:
-				E = iso_vm_pop(context);
 				D = iso_vm_pop(context);
+				C = iso_vm_pop(context);
 				
-				iso_vm_push(context,D/E);
+				iso_vm_push(context,C/D);
 				
 				break;
 			case ISO_OP_NOT:
