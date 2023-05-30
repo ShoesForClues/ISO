@@ -5,7 +5,7 @@
 
 #define ISO_OP_NOP 0x00
 #define ISO_OP_INT 0x10
-#define ISO_OP_REG 0x11
+#define ISO_OP_RSP 0x11
 #define ISO_OP_NUM 0x20
 #define ISO_OP_ARR 0x21
 #define ISO_OP_INC 0x30
@@ -81,6 +81,7 @@ iso_char iso_vm_fetch(
 	
 	if (PC==program_size) {
 		context->INT=ISO_INT_END_OF_PROGRAM;
+		
 		return 0;
 	}
 	
@@ -99,6 +100,7 @@ void iso_vm_push(
 	
 	if (SP>=stack_size) {
 		context->INT=ISO_INT_STACK_OVERFLOW;
+		
 		return;
 	}
 	
@@ -114,6 +116,7 @@ iso_word iso_vm_pop(
 	
 	if (SP==0) {
 		context->INT=ISO_INT_STACK_UNDERFLOW;
+		
 		return 0;
 	}
 	
@@ -132,6 +135,7 @@ void iso_vm_set(
 	
 	if (address>=SP) {
 		context->INT=ISO_INT_OUT_OF_BOUNDS;
+		
 		return;
 	}
 	
@@ -147,6 +151,7 @@ iso_word iso_vm_get(
 	
 	if (address>=SP) {
 		context->INT=ISO_INT_OUT_OF_BOUNDS;
+		
 		return 0;
 	}
 	
@@ -157,9 +162,8 @@ void iso_vm_goto(
 	iso_vm *context,
 	iso_uint address
 ) {
-	if (address>=context->program_size) {
+	if (address>=context->program_size)
 		context->INT=ISO_INT_ILLEGAL_JUMP;
-	}
 	
 	context->PC=address;
 }
@@ -189,51 +193,32 @@ iso_uint iso_vm_run(
 				*INT=(iso_uint)iso_vm_fetch(context);
 				
 				break;
-			case ISO_OP_REG:
+			case ISO_OP_RSP:
+				iso_vm_push(context,(iso_word)*SP);
 				
+				break;
 			case ISO_OP_NUM:
-				A=0;
+				A = 0;
 				
-				for (
-					iso_char i=0;
-					i<iso_vm_fetch(context);
-					i+=1
-				) {
-					A=(
-						(A<<sizeof(iso_char))|
-						(iso_uint)iso_vm_fetch(context)
-					);
-				}
+				for (iso_char i=0; i<iso_vm_fetch(context); i+=1)
+					A = (A<<8)|(iso_uint)iso_vm_fetch(context);
 				
 				iso_vm_push(context,(iso_word)A);
 				
 				break;
 			case ISO_OP_INC:
-				for (
-					iso_uint i=0;
-					i<(iso_uint)iso_vm_pop(context);
-					i++
-				) {
+				for (iso_uint i=0; i<(iso_uint)iso_vm_pop(context); i++)
 					iso_vm_push(context,0);
-				}
 				
 				break;
 			case ISO_OP_DEC:
-				for (
-					iso_uint i=0;
-					i<(iso_uint)iso_vm_pop(context);
-					i++
-				) {
+				for (iso_uint i=0; i<(iso_uint)iso_vm_pop(context); i++)
 					iso_vm_pop(context);
-				}
 				
 				break;
 			case ISO_OP_DUP:
-				if (*SP==0) {
-					iso_vm_push(context,0);
-					
+				if (*SP==0)
 					break;
-				}
 				
 				iso_vm_push(context,iso_vm_get(context,*SP-1));
 				
