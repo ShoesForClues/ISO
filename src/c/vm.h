@@ -1,3 +1,5 @@
+#include <math.h>
+
 #ifndef ISO_VM_H
 #define ISO_VM_H
 
@@ -7,7 +9,6 @@
 #define ISO_OP_INT 0x10
 #define ISO_OP_REG 0x11
 #define ISO_OP_NUM 0x20
-#define ISO_OP_ARR 0x21
 #define ISO_OP_SET 0x30
 #define ISO_OP_GET 0x31
 #define ISO_OP_INC 0x32
@@ -35,13 +36,13 @@
 
 /* Interrupt codes */
 
-#define ISO_INT_NONE                0x0000
-#define ISO_INT_ILLEGAL_INSTRUCTION 0x0100
-#define ISO_INT_ILLEGAL_JUMP        0x0101
-#define ISO_INT_END_OF_PROGRAM      0x0102
-#define ISO_INT_STACK_OVERFLOW      0x0200
-#define ISO_INT_STACK_UNDERFLOW     0x0201
-#define ISO_INT_OUT_OF_BOUNDS       0x0202
+#define ISO_INT_NONE              0x00
+#define ISO_INT_END_OF_PROGRAM    0x10
+#define ISO_INT_ILLEGAL_OPERATION 0x11
+#define ISO_INT_ILLEGAL_JUMP      0x12
+#define ISO_INT_STACK_OVERFLOW    0x20
+#define ISO_INT_STACK_UNDERFLOW   0x21
+#define ISO_INT_OUT_OF_BOUNDS     0x22
 
 /* Register codes */
 
@@ -49,10 +50,10 @@
 #define ISO_REG_PC  0x01
 #define ISO_REG_SP  0x02
 
-typedef double        iso_word;
-typedef signed int    iso_sint;
 typedef unsigned int  iso_uint;
+typedef signed int    iso_sint;
 typedef unsigned char iso_char;
+typedef double        iso_word;
 
 typedef struct {
 	iso_uint  INT;
@@ -64,17 +65,28 @@ typedef struct {
 	iso_word *stack;
 } iso_vm;
 
-void iso_vm_interrupt(iso_vm *context,iso_uint interrupt) {
+static inline void iso_vm_interrupt(
+	iso_vm *context,
+	iso_uint interrupt
+) {
 	context->INT=interrupt;
 }
 
-iso_char iso_vm_fetch(iso_vm *context) {
+iso_char iso_vm_fetch(
+	iso_vm *context
+) {
+	if (context->INT)
+		return 0;
+	
 	iso_uint  PC           = context->PC;
 	iso_uint  program_size = context->program_size;
 	iso_char *program      = context->program;
 	
 	if (PC==program_size) {
-		iso_vm_interrupt(context,ISO_INT_END_OF_PROGRAM);
+		iso_vm_interrupt(
+			context,
+			ISO_INT_END_OF_PROGRAM
+		);
 		
 		return 0;
 	}
@@ -84,13 +96,22 @@ iso_char iso_vm_fetch(iso_vm *context) {
 	return program[PC];
 }
 
-void iso_vm_push(iso_vm *context,iso_word value) {
+void iso_vm_push(
+	iso_vm *context,
+	iso_word value
+) {
+	if (context->INT)
+		return;
+	
 	iso_uint  SP         = context->SP;
 	iso_uint  stack_size = context->stack_size;
 	iso_word *stack      = context->stack;
 	
 	if (SP>=stack_size) {
-		iso_vm_interrupt(context,ISO_INT_STACK_OVERFLOW);
+		iso_vm_interrupt(
+			context,
+			ISO_INT_STACK_OVERFLOW
+		);
 		
 		return;
 	}
@@ -99,12 +120,20 @@ void iso_vm_push(iso_vm *context,iso_word value) {
 	stack[SP]   = value;
 }
 
-iso_word iso_vm_pop(iso_vm *context) {
+iso_word iso_vm_pop(
+	iso_vm *context
+) {
+	if (context->INT)
+		return 0;
+	
 	iso_uint  SP    = context->SP;
 	iso_word *stack = context->stack;
 	
 	if (SP==0) {
-		iso_vm_interrupt(context,ISO_INT_STACK_UNDERFLOW);
+		iso_vm_interrupt(
+			context,
+			ISO_INT_STACK_UNDERFLOW
+		);
 		
 		return 0;
 	}
@@ -114,12 +143,22 @@ iso_word iso_vm_pop(iso_vm *context) {
 	return stack[SP];
 }
 
-void iso_vm_set(iso_vm *context,iso_uint address,iso_word value) {
+void iso_vm_set(
+	iso_vm *context,
+	iso_uint address,
+	iso_word value
+) {
+	if (context->INT)
+		return;
+	
 	iso_uint  SP    = context->SP;
 	iso_word *stack = context->stack;
 	
 	if (address>=SP) {
-		iso_vm_interrupt(context,ISO_INT_OUT_OF_BOUNDS);
+		iso_vm_interrupt(
+			context,
+			ISO_INT_OUT_OF_BOUNDS
+		);
 		
 		return;
 	}
@@ -127,12 +166,21 @@ void iso_vm_set(iso_vm *context,iso_uint address,iso_word value) {
 	context->stack[address]=value;
 }
 
-iso_word iso_vm_get(iso_vm *context,iso_uint address) {
+iso_word iso_vm_get(
+	iso_vm *context,
+	iso_uint address
+) {
+	if (context->INT)
+		return 0;
+	
 	iso_uint  SP    = context->SP;
 	iso_word *stack = context->stack;
 	
 	if (address>=SP) {
-		iso_vm_interrupt(context,ISO_INT_OUT_OF_BOUNDS);
+		iso_vm_interrupt(
+			context,
+			ISO_INT_OUT_OF_BOUNDS
+		);
 		
 		return 0;
 	}
@@ -140,9 +188,18 @@ iso_word iso_vm_get(iso_vm *context,iso_uint address) {
 	return context->stack[address];
 }
 
-void iso_vm_goto(iso_vm *context,iso_uint address) {
+void iso_vm_jump(
+	iso_vm *context,
+	iso_uint address
+) {
+	if (context->INT)
+		return;
+	
 	if (address>=context->program_size) {
-		iso_vm_interrupt(context,ISO_INT_ILLEGAL_JUMP);
+		iso_vm_interrupt(
+			context,
+			ISO_INT_ILLEGAL_JUMP
+		);
 		
 		return;
 	}
@@ -150,7 +207,9 @@ void iso_vm_goto(iso_vm *context,iso_uint address) {
 	context->PC=address;
 }
 
-iso_uint iso_vm_run(iso_vm *context) {
+iso_uint iso_vm_run(
+	iso_vm *context
+) {
 	if (context->INT!=0)
 		return context->INT;
 	
@@ -180,38 +239,28 @@ iso_uint iso_vm_run(iso_vm *context) {
 			case ISO_OP_REG:
 				switch(iso_vm_fetch(context)) {
 					case ISO_REG_INT:
-						iso_vm_push(context,(iso_word)*INT);
+						I = (iso_word)*INT;
 						
 						break;
 					case ISO_REG_PC:
-						iso_vm_push(context,(iso_word)*PC);
+						I = (iso_word)*PC;
 						
 						break;
 					case ISO_REG_SP:
-						iso_vm_push(context,(iso_word)*SP);
+						I = (iso_word)*SP;
 						
 						break;
 					default:
 						iso_vm_interrupt(
 							context,
-							ISO_INT_ILLEGAL_INSTRUCTION
+							ISO_INT_ILLEGAL_OPERATION
 						);
 				}
 				
+				iso_vm_push(context,I);
+				
 				break;
 			case ISO_OP_NUM:
-				B = (iso_uint)iso_vm_fetch(context);
-				C = 0;
-				
-				for (A=0; A<B; A++) {
-					D = (iso_uint)iso_vm_fetch(context);
-					C = (C<<8)|D;
-				}
-				
-				iso_vm_push(context,(iso_word)C);
-				
-				break;
-			case ISO_OP_ARR:
 				E = (iso_sint)iso_vm_fetch(context);
 				F = (iso_sint)iso_vm_fetch(context);
 				
@@ -245,7 +294,9 @@ iso_uint iso_vm_run(iso_vm *context) {
 				if (*SP==0)
 					break;
 				
-				iso_vm_push(context,iso_vm_get(context,*SP-1));
+				I = iso_vm_get(context,*SP-1);
+				
+				iso_vm_push(context,I);
 				
 				break;
 			case ISO_OP_POP:
@@ -266,7 +317,7 @@ iso_uint iso_vm_run(iso_vm *context) {
 			case ISO_OP_JMP:
 				A = (iso_uint)iso_vm_pop(context);
 				
-				iso_vm_goto(context,A);
+				iso_vm_jump(context,A);
 				
 				break;
 			case ISO_OP_JEQ:
@@ -275,7 +326,7 @@ iso_uint iso_vm_run(iso_vm *context) {
 				I = iso_vm_pop(context);
 				
 				if (I==J)
-					iso_vm_goto(context,A);
+					iso_vm_jump(context,A);
 				
 				break;
 			case ISO_OP_JNE:
@@ -284,7 +335,7 @@ iso_uint iso_vm_run(iso_vm *context) {
 				I = iso_vm_pop(context);
 				
 				if (I!=J)
-					iso_vm_goto(context,A);
+					iso_vm_jump(context,A);
 				
 				break;
 			case ISO_OP_JLS:
@@ -293,7 +344,7 @@ iso_uint iso_vm_run(iso_vm *context) {
 				I = iso_vm_pop(context);
 				
 				if (I<J)
-					iso_vm_goto(context,A);
+					iso_vm_jump(context,A);
 				
 				break;
 			case ISO_OP_JLE:
@@ -302,93 +353,109 @@ iso_uint iso_vm_run(iso_vm *context) {
 				I = iso_vm_pop(context);
 				
 				if (I<=J)
-					iso_vm_goto(context,A);
+					iso_vm_jump(context,A);
 				
 				break;
 			case ISO_OP_ADD:
 				J = iso_vm_pop(context);
 				I = iso_vm_pop(context);
+				K = I+J;
 				
-				iso_vm_push(context,I+J);
+				iso_vm_push(context,K);
 				
 				break;
 			case ISO_OP_SUB:
 				J = iso_vm_pop(context);
 				I = iso_vm_pop(context);
+				K = I-J;
 				
-				iso_vm_push(context,I-J);
+				iso_vm_push(context,K);
 				
 				break;
 			case ISO_OP_MUL:
 				J = iso_vm_pop(context);
 				I = iso_vm_pop(context);
+				J = I*J;
 				
-				iso_vm_push(context,I*J);
+				iso_vm_push(context,K);
 				
 				break;
 			case ISO_OP_DIV:
 				J = iso_vm_pop(context);
 				I = iso_vm_pop(context);
+				K = I/J;
 				
-				iso_vm_push(context,I/J);
+				iso_vm_push(context,K);
 				
 				break;
-			case ISO_OP_POW: /* NYI */
+			case ISO_OP_POW:
+				J = iso_vm_pop(context);
+				I = iso_vm_pop(context);
+				K = (iso_word)pow((double)I,(double)J);
+				
+				iso_vm_push(context,K);
 				
 				break;
 			case ISO_OP_MOD:
 				J = iso_vm_pop(context);
 				I = iso_vm_pop(context);
 				E = (iso_sint)(I/J);
+				K = I-(iso_word)E*J;
 				
-				iso_vm_push(context,I-(iso_word)E*J);
+				iso_vm_push(context,K);
 				
 				break;
 			case ISO_OP_NOT:
 				A = (iso_uint)iso_vm_pop(context);
+				I = (iso_word)~A;
 				
-				iso_vm_push(context,(iso_word)~A);
+				iso_vm_push(context,I);
 				
 				break;
 			case ISO_OP_AND:
 				B = (iso_uint)iso_vm_pop(context);
 				A = (iso_uint)iso_vm_pop(context);
+				I = (iso_word)(A&B);
 				
-				iso_vm_push(context,(iso_word)(A&B));
+				iso_vm_push(context,I);
 				
 				break;
 			case ISO_OP_BOR:
 				B = (iso_uint)iso_vm_pop(context);
 				A = (iso_uint)iso_vm_pop(context);
+				I = (iso_word)(A|B);
 				
-				iso_vm_push(context,(iso_word)(A|B));
+				iso_vm_push(context,I);
 				
 				break;
 			case ISO_OP_XOR:
 				B = (iso_uint)iso_vm_pop(context);
 				A = (iso_uint)iso_vm_pop(context);
+				I = (iso_word)(A^B);
 				
-				iso_vm_push(context,(iso_word)(A^B));
+				iso_vm_push(context,I);
 				
 				break;
 			case ISO_OP_LSH:
 				B = (iso_uint)iso_vm_pop(context);
 				A = (iso_uint)iso_vm_pop(context);
+				I = (iso_word)(A<<B);
 				
-				iso_vm_push(context,(iso_word)(A<<B));
+				iso_vm_push(context,I);
 				
 				break;
 			case ISO_OP_RSH:
 				B = (iso_uint)iso_vm_pop(context);
 				A = (iso_uint)iso_vm_pop(context);
+				I = (iso_word)(A>>B);
 				
-				iso_vm_push(context,(iso_word)(A>>B));
+				iso_vm_push(context,I);
 				
 				break;
 			default:
 				iso_vm_interrupt(
 					context,
-					ISO_INT_ILLEGAL_INSTRUCTION
+					ISO_INT_ILLEGAL_OPERATION
 				);
 		}
 	} while (*INT==0);
